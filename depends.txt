@@ -1,4 +1,2 @@
 place_rotated
 mesecons
-dye
-wool
