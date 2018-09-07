@@ -177,7 +177,7 @@ local function remove_insulation(itemstack, placer, pointed_thing)
 			local state = under.name:match("^3d_wires:insulated_wire_(.*)")
 			if state then
 				modify_wire(pos, placer, {name = "3d_wires:wire_"..state})
-				placer:get_inventory():add_item("main", minetest.itemstring_with_palette("3d_wires:insulation", under.param2))
+				minetest.handle_node_drops(pos, {minetest.itemstring_with_palette("3d_wires:insulation", under.param2)}, placer)
 				return itemstack
 			end
 		end
@@ -203,7 +203,7 @@ local function add_insulation(itemstack, placer, pointed_thing)
 			elseif type == "insulated_" then
 				modify_wire(pos, placer, {name = "3d_wires:insulated_wire_"..state, param2 = color}, true)
 				take_unless_creative(placer, itemstack)
-				placer:get_inventory():add_item("main", minetest.itemstring_with_palette("3d_wires:insulation", under.param2))
+				minetest.handle_node_drops(pos, {minetest.itemstring_with_palette("3d_wires:insulation", under.param2)}, placer)
 				return itemstack
 			end
 		end
@@ -331,7 +331,7 @@ for i = 0, 2^6-1 do
 	local node_box, insulated_node_box, mesecon_rules = generate_wire_info(full_box, full_insulated, i)
 	--insulated wires
 	local name = "3d_wires:insulated_wire_"..i
-	local wire_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2}
+	local wire_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, mesecon_conductor_craftable = 1}
 	if i ~= 0 then wire_groups.not_in_creative_inventory = 1 end
 	mesecon.register_node(name, {
 		drop = {
@@ -350,16 +350,16 @@ for i = 0, 2^6-1 do
 		climbable = true,
 		palette = "3dwires_palette.png",
 	},{
-		tiles = {"3dwires_wool.png"},
-		overlay_tiles = make_texture_list(i, {name = "placerotated_wire_end.png", color = "white"}, ""),
+		tiles = {"3dwires_insulation_off.png"},
+		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png", color = "white"}, ""),
 		mesecons = {conductor = {
 			state = "off",
 			onstate = name.."_on",
 			rules = mesecon_rules,
 		}}
 	},{
-		tiles = {"3dwires_wool.png^[brighten"},
-		overlay_tiles = make_texture_list(i, {name = "placerotated_wire_end.png^[brighten", color = "white"}, ""),
+		tiles = {"3dwires_insulation_on.png"},
+		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_on.png^[mask:3dwires_wire_end_mask.png", color = "white"}, ""),
 		mesecons = {conductor = {
 			state = "on",
 			offstate = name.."_off",
@@ -379,7 +379,7 @@ for i = 0, 2^6-1 do
 		node_placement_prediction = "", -- let server update node
 	},{
 		groups = wire_groups,
-		tiles = {"default_mese_block.png"},
+		tiles = {"mesecons_wire_off.png"},
 		mesecons = {conductor = {
 			state = "off",
 			onstate = name.."_on",
@@ -387,7 +387,7 @@ for i = 0, 2^6-1 do
 		}}
 	},{
 		groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, not_in_creative_inventory = 1},
-		tiles = {"default_mese_block.png^[brighten"},
+		tiles = {"mesecons_wire_on.png"},
 		mesecons = {conductor = {
 			state = "on",
 			offstate = name.."_off",
@@ -395,6 +395,118 @@ for i = 0, 2^6-1 do
 		}}
 	})
 end
+
+local function make_color_machine_formspec(slider_color)
+	return ([=[
+		size[8,7.5]
+		label[0,0;Red:]
+		scrollbar[1,0;5,0.5;horizontal;red;%d]
+		label[0,1;Green:]
+		scrollbar[1,1;5,0.5;horizontal;green;%d]
+		label[0,2;Blue:]
+		scrollbar[1,2;5,0.5;horizontal;blue;%d]
+		
+		list[current_player;main;0,3.25;8,1;]
+		list[current_player;main;0,4.5;8,3;8]
+		
+		label[6.5,0.25;Insulation:]
+		list[context;insulation;6.5,0.75;1,1;]
+		listring[]
+		
+	]=]):format(
+		slider_color.red*1000, slider_color.green*1000, slider_color.blue*1000
+	)
+end
+
+local function limit_color(color)
+	--bad
+	color.red   = math.min(math.floor(color.red  *8)/7,1)
+	color.green = math.min(math.floor(color.green*8)/7,1)
+	color.blue  = math.min(math.floor(color.blue *4)/3,1)
+end
+
+local function color_to_palette(color)
+	return math.min(math.floor(color.red   * 8), 7) * 2^(2 + 3) +
+	       math.min(math.floor(color.green * 8), 7) * 2^2 +
+	       math.min(math.floor(color.blue  * 4), 3)
+end
+
+local function color_from_meta(meta)
+	return {
+		red=meta:get_int("red")/255,
+		green=meta:get_int("green")/255,
+		blue=meta:get_int("blue")/255,
+	}
+end
+
+-- When user interacts with formspec
+local function color_machine_interact(pos, formname, fields, sender)
+	local node = minetest.get_node_or_nil(pos)
+	if node and node.name == "3d_wires:color_machine" then
+		if fields.quit then
+			local meta = minetest.get_meta(pos)
+			meta:set_string("formspec",make_color_machine_formspec(color_from_meta(meta)))
+		else
+			local color = {}
+			local meta = minetest.get_meta(pos)
+			for name, field in pairs(fields) do
+				local data = minetest.explode_scrollbar_event(field)
+				color[name] = data.value/1000
+				meta:set_int(name,data.value/1000*255)
+			end
+			
+			local inv = meta:get_inventory()
+			local items = inv:get_stack("insulation",1)
+			local palette_index = color_to_palette(color)
+			
+			if items:get_name()=="3d_wires:insulation" then
+				items:get_meta():set_int("palette_index",palette_index)
+				inv:set_stack("insulation",1,items)
+			end
+		end
+	end
+end
+
+-- Block items other than insulation in the insulation slot
+local function color_machine_input_filter(pos, listname, index, stack, player)
+	if listname == "insulation" and stack:get_name() ~= "3d_wires:insulation" then
+		return 0
+	else
+		return stack:get_count()
+	end
+end
+
+-- When an item is put in the insulation field, set its color
+local function color_machine_on_put(pos, listname, index, stack, player)
+	local node = minetest.get_node_or_nil(pos)
+	if node and node.name == "3d_wires:color_machine" and listname == "insulation" then
+		local meta = minetest.get_meta(pos)
+		local inv = meta:get_inventory()
+		local items = inv:get_stack(listname,index)
+		local palette_index = color_to_palette(color_from_meta(meta))
+		if items:get_name() == "3d_wires:insulation" then
+			items:get_meta():set_int("palette_index", palette_index)
+			inv:set_stack(listname, index, items)
+		end
+	end
+end
+
+-- Machine for coloring insulation
+minetest.register_node("3d_wires:color_machine",{
+	description = "Insulation Coloring Machine",
+	tiles = {"3dwires_color_machine.png"},
+	groups = {cracky = 2},
+	-- Create formspec and inventory after node is created
+	on_construct = function(pos)
+		local meta = minetest.get_meta(pos)
+		meta:set_string("formspec", make_color_machine_formspec({red=0, green=0, blue=0}))
+		local inv = meta:get_inventory()
+		inv:set_size("insulation", 1)
+	end,
+	on_receive_fields = color_machine_interact,
+	allow_metadata_inventory_put = color_machine_input_filter,
+	on_metadata_inventory_put = color_machine_on_put,
+})
 
 -- =========
 -- # ITEMS #
@@ -416,41 +528,11 @@ minetest.register_craftitem("3d_wires:insulation", {
 -- Punch = remove connection
 minetest.register_tool("3d_wires:wire_cutters", {
 	description = "Wire Cutters",
-	inventory_image = "placerotated_wire_cutters.png",
+	inventory_image = "3dwires_wire_cutters.png",
 	on_place = splice_wire,
 	on_use = cut_wire,
 })
 
--- ===========
--- # RECIPES #
--- ===========
-
-minetest.register_craft({
-	output = "3d_wires:wire_cutters",
-	recipe = {
-		{"default:steel_ingot",""                   ,"default:steel_ingot"},
-		{""                   ,"default:steel_ingot",""                   },
-		{"group:stick"        ,""                   ,"group:stick"        },
-	},
-})
-
-minetest.register_craft({
-	output = "3d_wires:diode_off",
-	recipe = {
-		{"3d_wires:wire_0_off","mesecons_materials:silicon","3d_wires:wire_0_off"},
-	},
-})
-
-dofile(minetest.get_modpath("3d_wires").."/gates.lua")
-
---make not gate use yellow instead of red
---maybe use yellow to signify inverted input/output
---put output marker on all gates
-
---idea: use param2 coloring to have colored insulated wires!!!!
---use colored wool on wires to put insulation maybe
---ok using wool is total crap I'll have to define a custom item for this :(
-
---controls:
--- punch wire = remove insulation
--- right click with insulation = add/replace insulation
+dofile(minetest.get_modpath("3d_wires").."/gates.lua") -- Logic gates
+dofile(minetest.get_modpath("3d_wires").."/craft.lua") -- Crafting recipes
+dofile(minetest.get_modpath("3d_wires").."/outputs.lua") -- "effectors"
