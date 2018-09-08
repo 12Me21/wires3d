@@ -26,22 +26,6 @@ end
 -- For node textures, it's [Y+ y- X+ x- Z+ z-] so we have to convert to this when specifying tiles.
 local direction_to_texture_index = {4, 2, 6, 3, 1, 5}
 
---iterator
---index, mask
-function bits(field)
-	local i = 1
-	local bit = 1
-	return function()
-		if field == 0 then return end
-		while field % 2 == 0 do
-			field = field / 2
-			i = i + 1
-			bit = bit * 2
-		end
-		return i, bit
-	end
-end
-
 -- Debug
 local function disp(x)
 	minetest.chat_send_all(dump(x))
@@ -53,21 +37,17 @@ local function check_bit(x, bit)
 	-- return (x >> bit & 1) == 1
 end
 
--- Check whether the mesecon at <pos> has <direction> in its input/output rules
-function check_connect(pos, direction)
-	local node = minetest.get_node(pos)
-	local rules = mesecon.get_any_inputrules(node)
+local function check_rules(rules, direction)
 	if rules then
 		for i,rule in ipairs(mesecon.flattenrules(rules)) do -- do I need to flatten rules here?
 			if vector.equals(rule,direction) then return true end
 		end
 	end
-	rules = mesecon.get_any_outputrules(node)
-	if rules then
-		for i,rule in ipairs(mesecon.flattenrules(rules)) do
-			if vector.equals(rule,direction) then return true end
-		end
-	end
+end
+-- Check whether the mesecon at <pos> has <direction> in its input/output rules
+function check_connect(pos, direction)
+	local node = minetest.get_node_or_nil(pos)
+	return node and check_rules(mesecon.get_any_inputrules(node), direction) or check_rules(mesecon.get_any_outputrules(node),direction)
 end
 
 -- Detect which sides of a node at <pos> should connect to surrounding mesecons
@@ -186,7 +166,6 @@ end
 
 -- Add insulation to a wire, or replace existing insulation
 -- on_place
--- TODO: complain about how creative mode doesn't have a system for handling custom drops
 local function add_insulation(itemstack, placer, pointed_thing)
 	local pos = pointed_thing.under
 	if pos then
@@ -286,14 +265,13 @@ end
 
 -- Generate wire node boxes and connection rules for a given connection state
 local function generate_wire_info(full, full_insulated, bits)
-	local node_box = {type = "fixed", fixed = {full.fixed}}
-	local insulated_node_box = {type = "fixed", fixed = {full_insulated.fixed}}
+	local node_box = {type = "fixed", fixed = {full.center}}
+	local insulated_node_box = {type = "fixed", fixed = {full_insulated.center}}
 	local mesecon_rules = {}
 	for i = 0, 5 do
 		if check_bit(bits, i) then
-			local name = directions[i+1].name
-			table.insert(node_box.fixed, full["connect_"..name])
-			table.insert(insulated_node_box.fixed, full_insulated["connect_"..name])
+			table.insert(node_box.fixed, full[i+1])
+			table.insert(insulated_node_box.fixed, full_insulated[i+1])
 			table.insert(mesecon_rules, directions[i+1].vector)
 		end
 	end
@@ -303,19 +281,15 @@ end
 local wire_radius = 2/16
 local insulated_wire_radius = 3/16
 
--- Originally the non-insulated wires used connected nodeboxes, but this ended up being too limited
--- I switched to having a different node for each connection state,
--- so now this is just used as a lookup table when generating the nodeboxes
-local function make_wire_nodebox(size)
+local function make_wire_nodeboxes(size)
 	return {
-		type = "connected",
-		fixed          = {-size, -size, -size, size, size, size},
-		connect_left   = {-0.5 , -size, -size, size, size, size}, -- x-
-		connect_right  = {-size, -size, -size, 0.5 , size, size}, -- x+
-		connect_bottom = {-size, -0.5 , -size, size, size, size}, -- y-
-		connect_top    = {-size, -size, -size, size, 0.5 , size}, -- y+
-		connect_front  = {-size, -size, -0.5 , size, size, size}, -- z-
-		connect_back   = {-size, -size,  size, size, size, 0.5 }, -- z+
+		{-0.5 , -size, -size, size, size, size}, -- x-
+		{-size, -0.5 , -size, size, size, size}, -- y-
+		{-size, -size, -0.5 , size, size, size}, -- z-
+		{-size, -size, -size, 0.5 , size, size}, -- x+
+		{-size, -size, -size, size, 0.5 , size}, -- y+
+		{-size, -size,  size, size, size, 0.5 }, -- z+
+		center = {-size, -size, -size, size, size, size}, -- middle
 	}
 end
 
@@ -326,14 +300,12 @@ for i, direction in ipairs(directions) do
 end
 wires.all_connections = all_connections
 
-local full_box = make_wire_nodebox(wire_radius)
-local full_insulated = make_wire_nodebox(insulated_wire_radius)
+local full_box = make_wire_nodeboxes(wire_radius)
+local full_insulated = make_wire_nodeboxes(insulated_wire_radius)
 for i = 0, 2^6-1 do
 	local node_box, insulated_node_box, mesecon_rules = generate_wire_info(full_box, full_insulated, i)
-	--insulated wires
+	-- Insulated wire:
 	local name = "3d_wires:insulated_wire_"..i
-	local wire_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, mesecon_conductor_craftable = 1}
-	if i ~= 0 then wire_groups.not_in_creative_inventory = 1 end
 	mesecon.register_node(name, {
 		drop = {
 			items = {
@@ -343,12 +315,12 @@ for i = 0, 2^6-1 do
 		},
 		paramtype = "light",
 		paramtype2 = "color",
+		palette = "3dwires_palette.png",
 		drawtype = "nodebox",
 		node_box = insulated_node_box,
 		groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, not_in_creative_inventory = 1},
 		walkable = false,
 		climbable = true,
-		palette = "3dwires_palette.png",
 	},{
 		tiles = {"3dwires_insulation_off.png"},
 		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png", color = "white"}, ""),
@@ -366,7 +338,9 @@ for i = 0, 2^6-1 do
 			rules = mesecon_rules,
 		}}
 	})
-	--normal wires
+	-- Non-insulated wires:
+	local wire_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, mesecon_conductor_craftable = 1}
+	if i ~= 0 then wire_groups.not_in_creative_inventory = 1 end
 	local name = "3d_wires:wire_"..i
 	mesecon.register_node(name, {
 		drop = "3d_wires:wire_0_off",
@@ -396,46 +370,43 @@ for i = 0, 2^6-1 do
 	})
 end
 
+-- Generate formspec for color machine
+-- Insert initial values for color sliders
 local function make_color_machine_formspec(slider_color)
-	return ([=[
-		size[8,7.5]
-		label[0,0;Red:]
-		scrollbar[1,0;5,0.5;horizontal;red;%d]
-		label[0,1;Green:]
-		scrollbar[1,1;5,0.5;horizontal;green;%d]
-		label[0,2;Blue:]
-		scrollbar[1,2;5,0.5;horizontal;blue;%d]
-		
-		list[current_player;main;0,3.25;8,1;]
-		list[current_player;main;0,4.5;8,3;8]
-		
-		label[6.5,0.25;Insulation:]
-		list[context;insulation;6.5,0.75;1,1;]
-		listring[]
-		
-	]=]):format(
-		slider_color.red*1000, slider_color.green*1000, slider_color.blue*1000
+	return (
+[=[
+size[8,7.5]
+label[0,0;Red:]
+scrollbar[1,0;5,0.5;horizontal;red;%d]
+label[0,1;Green:]
+scrollbar[1,1;5,0.5;horizontal;green;%d]
+label[0,2;Blue:]
+scrollbar[1,2;5,0.5;horizontal;blue;%d]
+list[current_player;main;0,3.25;8,1;]
+list[current_player;main;0,4.5;8,3;8]
+label[6.5,0.25;Insulation:]
+list[context;insulation;6.5,0.75;1,1;]
+listring[]]=]
+	):format(
+		slider_color.red * 1000, slider_color.green * 1000, slider_color.blue * 1000
 	)
 end
 
-local function limit_color(color)
-	--bad
-	color.red   = math.min(math.floor(color.red  *8)/7,1)
-	color.green = math.min(math.floor(color.green*8)/7,1)
-	color.blue  = math.min(math.floor(color.blue *4)/3,1)
+local function inclusive_to(value, max)
+	return math.min(math.floor(value * max), max - 1)
 end
 
 local function color_to_palette(color)
-	return math.min(math.floor(color.red   * 8), 7) * 2^(2 + 3) +
-	       math.min(math.floor(color.green * 8), 7) * 2^2 +
-	       math.min(math.floor(color.blue  * 4), 3)
+	return inclusive_to(color.red  ,8) * 2^(2 + 3) +
+	       inclusive_to(color.green,8) * 2^2 +
+	       inclusive_to(color.blue ,4)
 end
 
 local function color_from_meta(meta)
 	return {
-		red   = meta:get_int("red") / 255,
+		red   = meta:get_int("red")   / 255,
 		green = meta:get_int("green") / 255,
-		blue  = meta:get_int("blue") / 255,
+		blue  = meta:get_int("blue")  / 255,
 	}
 end
 
@@ -447,6 +418,8 @@ local function color_machine_interact(pos, formname, fields, sender)
 			local meta = minetest.get_meta(pos)
 			meta:set_string("formspec", make_color_machine_formspec(color_from_meta(meta)))
 		else
+			-- Assume that the formspec will only contain red/green/blue fields
+			-- Not very safe...
 			local color = {}
 			local meta = minetest.get_meta(pos)
 			for name, field in pairs(fields) do
