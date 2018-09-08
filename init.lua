@@ -230,37 +230,38 @@ local function cut_wire(itemstack, placer, pointed_thing)
 	end
 end
 
+-- Add connection to an insulated wire given a bunch of info
+local function add_connection(pos, node, placer, field, normal, state)
+	local face = vector_to_direction(normal)
+	if face and not check_bit(field, face-1) then
+		modify_wire(pos, placer, {name = "3d_wires:insulated_wire_"..(field + 2^(face - 1))..state, param2 = node.param2})
+		return true
+	end
+end
+
 -- Add a connection to an insulated wire
 -- on_place
-local function splice_wire(itemstack,placer,pointed_thing)
+local function splice_wire(itemstack, placer, pointed_thing)
 	if pointed_thing.under then
 		local under=minetest.get_node(pointed_thing.under)
 		if under then
 			-- First, try to add a connection to the node that was clicked
-			local field,state = under.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
+			local field, state = under.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
 			if field then
 				local normal, point, box = place_rotated.get_point(placer)
 				local arm = pointed_box_to_direction(box, field)
 				if arm == 0 then
-					local face = vector_to_direction(normal)
-					if face and not check_bit(field, face-1) then
-						modify_wire(pointed_thing.under,placer,{name="3d_wires:insulated_wire_"..(field+2^(face-1))..state, param2 = under.param2})
-						return
-					end
+					if add_connection(pointed_thing.under, under, placer, field, normal, state) then return end
 				end
 			end
 			-- If that didn't work, also try adding a connection to the `above` node.
 			-- This is so you can click on the node *behind* a wire to modify the side of the wire which is facing away from you
-			local above=minetest.get_node(pointed_thing.above)
+			local above = minetest.get_node(pointed_thing.above)
 			if above then
-				local field,state = above.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
+				local field, state = above.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
 				if field then
 					local normal, point, box = place_rotated.get_point(placer)
-					local face = vector_to_direction(vector.multiply(normal,-1))
-					if face and not check_bit(field, face-1) then
-						modify_wire(pointed_thing.above,placer,{name="3d_wires:insulated_wire_"..(field+2^(face-1))..state, param2 = above.param2})
-						return
-					end
+					if add_connection(pointed_thing.above, above, placer, field, vector.multiply(normal, -1), state) then return end
 				end
 			end
 		end
@@ -308,13 +309,13 @@ local insulated_wire_radius = 3/16
 local function make_wire_nodebox(size)
 	return {
 		type = "connected",
-		fixed          = {-size, -size, -size, size,  size, size},
-		connect_left   = {-0.5,  -size, -size, size,  size, size}, -- x-
-		connect_right  = {-size, -size, -size, 0.5,   size, size}, -- x+
-		connect_bottom = {-size, -0.5,  -size, size,  size, size}, -- y-
-		connect_top    = {-size, -size, -size, size,  0.5,  size}, -- y+
-		connect_front  = {-size, -size, -0.5,  size,  size, size}, -- z-
-		connect_back   = {-size, -size,  size, size,  size, 0.5 }, -- z+
+		fixed          = {-size, -size, -size, size, size, size},
+		connect_left   = {-0.5 , -size, -size, size, size, size}, -- x-
+		connect_right  = {-size, -size, -size, 0.5 , size, size}, -- x+
+		connect_bottom = {-size, -0.5 , -size, size, size, size}, -- y-
+		connect_top    = {-size, -size, -size, size, 0.5 , size}, -- y+
+		connect_front  = {-size, -size, -0.5 , size, size, size}, -- z-
+		connect_back   = {-size, -size,  size, size, size, 0.5 }, -- z+
 	}
 end
 
@@ -340,7 +341,6 @@ for i = 0, 2^6-1 do
 				{items = {"3d_wires:wire_0_off"}},
 			}
 		},
-		description = "Insulated 3D Wire",
 		paramtype = "light",
 		paramtype2 = "color",
 		drawtype = "nodebox",
@@ -433,9 +433,9 @@ end
 
 local function color_from_meta(meta)
 	return {
-		red=meta:get_int("red")/255,
-		green=meta:get_int("green")/255,
-		blue=meta:get_int("blue")/255,
+		red   = meta:get_int("red") / 255,
+		green = meta:get_int("green") / 255,
+		blue  = meta:get_int("blue") / 255,
 	}
 end
 
@@ -445,23 +445,21 @@ local function color_machine_interact(pos, formname, fields, sender)
 	if node and node.name == "3d_wires:color_machine" then
 		if fields.quit then
 			local meta = minetest.get_meta(pos)
-			meta:set_string("formspec",make_color_machine_formspec(color_from_meta(meta)))
+			meta:set_string("formspec", make_color_machine_formspec(color_from_meta(meta)))
 		else
 			local color = {}
 			local meta = minetest.get_meta(pos)
 			for name, field in pairs(fields) do
 				local data = minetest.explode_scrollbar_event(field)
-				color[name] = data.value/1000
-				meta:set_int(name,data.value/1000*255)
+				color[name] = data.value / 1000
+				meta:set_int(name, data.value / 1000 * 255)
 			end
 			
 			local inv = meta:get_inventory()
-			local items = inv:get_stack("insulation",1)
-			local palette_index = color_to_palette(color)
-			
-			if items:get_name()=="3d_wires:insulation" then
-				items:get_meta():set_int("palette_index",palette_index)
-				inv:set_stack("insulation",1,items)
+			local items = inv:get_stack("insulation", 1)
+			if items:get_name() == "3d_wires:insulation" then
+				items:get_meta():set_int("palette_index", color_to_palette(color))
+				inv:set_stack("insulation", 1, items)
 			end
 		end
 	end
@@ -483,9 +481,8 @@ local function color_machine_on_put(pos, listname, index, stack, player)
 		local meta = minetest.get_meta(pos)
 		local inv = meta:get_inventory()
 		local items = inv:get_stack(listname,index)
-		local palette_index = color_to_palette(color_from_meta(meta))
 		if items:get_name() == "3d_wires:insulation" then
-			items:get_meta():set_int("palette_index", palette_index)
+			items:get_meta():set_int("palette_index", color_to_palette(color_from_meta(meta)))
 			inv:set_stack(listname, index, items)
 		end
 	end
