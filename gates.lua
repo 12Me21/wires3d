@@ -3,7 +3,7 @@ local diode_radius = 4/16
 
 local function rotate_rule(rule, axis, rotation)
 	for i = 1, rotation do
-		rule.x, rule.z = -rule.z, rule.x
+		rule.x, rule.z = rule.z, -rule.x
 	end
 	
 	-- Y+ (no change)
@@ -43,12 +43,12 @@ end
 
 local gates = {
 	["and_gate"]     = {name = "And Gate"             , operation = function(a,b) return a and b end     , inputs = 2},
-	["and_not_gate"] = {name = "Comparator"    , operation = function(a,b) return a and not b end , inputs = 2}, -- A > B
+	["and_not_gate"] = {name = "Comparator"           , operation = function(a,b) return a and not b end , inputs = 2}, -- A > B
 	["xor_gate"]     = {name = "Not Equal (Xor) Gate" , operation = function(a,b) return a ~= b end      , inputs = 2}, -- A != B
 	["or_gate"]      = {name = "Or Gate"              , operation = function(a,b) return a or b end      , inputs = 2},
 	["nor_gate"]     = {name = "Nor Gate"             , operation = function(a,b) return not(a or b) end , inputs = 2},
 	["nxor_gate"]    = {name = "Equal (Xnor) Gate"    , operation = function(a,b) return a == b end      , inputs = 2}, -- A == B
-	["or_not_gate"]  = {name = "Inverted Comparator", operation = function(a,b) return a or not b end  , inputs = 2}, -- A >= B
+	["or_not_gate"]  = {name = "Inverted Comparator"  , operation = function(a,b) return a or not b end  , inputs = 2}, -- A >= B
 	["nand_gate"]    = {name = "Nand Gate"            , operation = function(a,b) return not(a and b) end, inputs = 2},
 	
 	["diode"]        = {name = "Diode"                , operation = function(a) return a end             , inputs = 1},
