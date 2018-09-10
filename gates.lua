@@ -1,6 +1,11 @@
 local wire_radius = 2/16
 local diode_radius = 4/16
 
+local function check_bit(x, bit)
+	return math.floor(x / 2^bit) % 2 == 1
+	-- return (x >> bit & 1) == 1
+end
+
 local function rotate_rule(rule, axis, rotation)
 	for i = 1, rotation do
 		rule.x, rule.z = rule.z, -rule.x
@@ -69,7 +74,7 @@ local gate_input_rules = {
 	}),
 }
 
-local function make_gate_updater(gate_function, off_state, on_state, inputs)
+local function make_gate_updater(gate_function, basename, inputs)
 	if inputs == 1 then
 		return function(pos, node, link, newstate)
 			if mesecon.do_overheat(pos) then
@@ -77,12 +82,15 @@ local function make_gate_updater(gate_function, off_state, on_state, inputs)
 				mesecon.receptor_off(pos, gate_output_rules(node))
 				local def = minetest.registered_nodes[node.name]
 				minetest.add_item(pos, def.drop)
-			elseif gate_function(newstate == "on") then
-				minetest.swap_node(pos, {name = on_state, param2 = node.param2})
-				mesecon.receptor_on(pos, gate_output_rules(node))
 			else
-				minetest.swap_node(pos, {name = off_state, param2 = node.param2})
-				mesecon.receptor_off(pos, gate_output_rules(node))
+				local name = basename.."_"..(newstate == "on" and "1" or "0")
+				if gate_function(newstate == "on") then
+					minetest.swap_node(pos, {name = name.."_on", param2 = node.param2})
+					mesecon.receptor_on(pos, gate_output_rules(node))
+				else
+					minetest.swap_node(pos, {name = name.."_off", param2 = node.param2})
+					mesecon.receptor_off(pos, gate_output_rules(node))
+				end
 			end
 		end
 	else
@@ -94,12 +102,17 @@ local function make_gate_updater(gate_function, off_state, on_state, inputs)
 				mesecon.receptor_off(pos, gate_output_rules(node))
 				local def = minetest.registered_nodes[node.name]
 				minetest.add_item(pos, def.drop)			
-			elseif gate_function(meta:get_int("1") == 1, meta:get_int("2") == 1) then
-				minetest.swap_node(pos, {name = on_state, param2 = node.param2})
-				mesecon.receptor_on(pos, gate_output_rules(node))			
 			else
-				minetest.swap_node(pos, {name = off_state, param2 = node.param2})
-				mesecon.receptor_off(pos, gate_output_rules(node))
+				local a = meta:get_int("1")
+				local b = meta:get_int("2")
+				local name = basename.."_"..(a + b*2)
+				if gate_function(a == 1, b == 1) then
+					minetest.swap_node(pos, {name = name.."_on", param2 = node.param2})
+					mesecon.receptor_on(pos, gate_output_rules(node))			
+				else
+					minetest.swap_node(pos, {name = name.."_off", param2 = node.param2})
+					mesecon.receptor_off(pos, gate_output_rules(node))
+				end
 			end
 		end
 	end
@@ -124,72 +137,112 @@ local gate_nodeboxes = {
 		}
 	},
 }
-local function make_gate_tiles(filename, inputs)
+
+local function make_wire_side_texture(state, side)
+	return "^(mesecons_wire_"..state..".png^[mask:3dwires_wire_"..side.."_mask.png)"
+end
+
+local function make_gate_tiles(filename, inputs, state, i)
 	if inputs==1 then
+		local input_state = check_bit(i, 0) and "on" or "off"
 		return {
-			"3dwires_gate_center.png^(mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png)",
-			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png^(mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png)",
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png",
+			--top
+			"3dwires_gate_center.png"..
+			make_wire_side_texture(input_state,"end"),
+			--bottom
+			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png"..
+			make_wire_side_texture(state,"end"),
+			--sides
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png"..
+			make_wire_side_texture(state,"bottom")..
+			make_wire_side_texture(input_state,"top"),
 		}
 	else
+		local a_state = check_bit(i, 0) and "on" or "off"
+		local b_state = check_bit(i, 1) and "on" or "off"
 		return {
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_"..filename.."_symbol.png",
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_diode_paint_bottom.png^(mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png)",
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_diode_paint_side.png^(mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png)",
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_diode_paint_side.png^(mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png)",
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_diode_paint_side.png^(3dwires_"..filename.."_symbol.png^[transformR180)",
-			"mesecons_wire_off.png^3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png",
+			--top
+			"3dwires_gate_center.png^3dwires_"..filename.."_symbol.png"..
+			make_wire_side_texture(a_state,"left")..
+			make_wire_side_texture(b_state,"right"),
+			--bottom
+			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png"..
+			make_wire_side_texture(a_state,"left")..
+			make_wire_side_texture(b_state,"right")..
+			make_wire_side_texture(state,"end"),
+			--right
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png"..
+			make_wire_side_texture(b_state,"end")..
+			make_wire_side_texture(state,"bottom"),
+			--left
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png"..
+			make_wire_side_texture(a_state,"end")..
+			make_wire_side_texture(state,"bottom"),
+			--back (+)
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png^(3dwires_"..filename.."_symbol.png^[transformR180)"..
+			make_wire_side_texture(a_state,"right")..
+			make_wire_side_texture(b_state,"left")..
+			make_wire_side_texture(state,"bottom"),
+			--front
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png"..
+			make_wire_side_texture(a_state,"left")..
+			make_wire_side_texture(b_state,"right")..
+			make_wire_side_texture(state,"bottom"),
 		}
 	end
 end
 
-local function make_on_tiles(off_tiles)
-	local on_tiles = {}
-	for i in ipairs(off_tiles) do
-		on_tiles[i] = off_tiles[i]:gsub("_off","_on")
+-- Sets "not_in_creative_inventory" if variant is not 0
+local function make_groups(groups, variant)
+	if variant ~= 0 then
+		local new_groups = table.copy(groups)
+		new_groups.not_in_creative_inventory = 1
+		return new_groups
+	else
+		return groups
 	end
-	return on_tiles
 end
+
+local gate_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, overheat = 1}
 
 -- Register on/off forms of a 2-input gate called <name> using <gate_function>
 local function define_gate(name, description, gate_function, inputs)
 	local basename = "3d_wires:"..name
-	local updater = make_gate_updater(gate_function, basename.."_off", basename.."_on", inputs)
-	local tiles = make_gate_tiles(name, inputs)
-	mesecon.register_node(basename, {
-		description = "3D " .. description,
-		paramtype = "light",
-		paramtype2 = "facedir",
-		on_place = place_rotated.log,
-		drawtype = "nodebox",
-		on_rotate = wires.on_rotate,
-		node_box = gate_nodeboxes[inputs],
-		walkable = false,
-		climbable = true,
-		onstate = basename.."_on",
-		offstate = basename.."_off",
-		node_placement_prediction = "",
-	},{
-		groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, overheat = 1},
-		tiles = tiles,
-		mesecons = {receptor = {
-			state = "off",
-			rules = gate_output_rules,
-		}, effector = {
-			rules = gate_input_rules[inputs],
-			action_change = updater
-		}}
-	},{
-		groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, not_in_creative_inventory = 1, overheat = 1},
-		tiles = make_on_tiles(tiles),
-		mesecons = {receptor = {
-			state = "on",
-			rules = gate_output_rules,
-		}, effector = {
-			rules = gate_input_rules[inputs],
-			action_change = updater
-		}}
-	})
+	local updater = make_gate_updater(gate_function, basename, inputs)
+	for i = 0, 2^inputs-1 do
+		mesecon.register_node(basename.."_"..i, {
+			description = "3D " .. description,
+			paramtype = "light",
+			paramtype2 = "facedir",
+			on_place = place_rotated.log,
+			drawtype = "nodebox",
+			on_rotate = wires.on_rotate,
+			node_box = gate_nodeboxes[inputs],
+			walkable = false,
+			climbable = true,
+			node_placement_prediction = "",
+		},{
+			groups = make_groups(gate_groups, i),
+			tiles = make_gate_tiles(name, inputs, "off", i),
+			mesecons = {receptor = {
+				state = "off",
+				rules = gate_output_rules,
+			}, effector = {
+				rules = gate_input_rules[inputs],
+				action_change = updater
+			}}
+		},{
+			groups = make_groups(gate_groups, -1),
+			tiles = make_gate_tiles(name, inputs, "on", i),
+			mesecons = {receptor = {
+				state = "on",
+				rules = gate_output_rules,
+			}, effector = {
+				rules = gate_input_rules[inputs],
+				action_change = updater
+			}}
+		})
+	end
 end
 
 for name, gate in pairs(gates) do
