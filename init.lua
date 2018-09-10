@@ -1,6 +1,4 @@
-wires = {}
--- Hmm...
--- Maybe rename mod to "wires_3d" so the name doesn't begin with a number
+wires3d = {}
 
 -- Official axis/face/direction ordering to be used whenever possible
 -- x- y- z- X+ Y+ Z+
@@ -68,7 +66,7 @@ end
 -- If there's a wire at <pos>, replace it with the correct variant to connect with surrounding mesecons.
 local function update_connections(pos)
 	local node = minetest.get_node_or_nil(pos)
-	if node and node.name:find("^3d_wires:wire_") then
+	if node and node.name:find("^wires3d:wire_") then
 		minetest.set_node(pos,{
 			-- Replace the number in the wire name with new value
 			name = node.name:gsub("_%d+", "_"..get_connections(pos), 1) --bad
@@ -79,7 +77,7 @@ end
 -- Autoconnect function
 -- Calls update_connections at <pos> and the 6 surrounding locations
 -- This is called whenever a node is placed or removed (basically)
-mesecon.register_autoconnect_hook("3d_wire", function(pos, node)
+mesecon.register_autoconnect_hook("wires3d", function(pos, node)
 	update_connections(pos)
 	for _, direction in ipairs(directions) do
 		update_connections(vector.add(pos, direction.vector))
@@ -113,7 +111,7 @@ end
 -- This is for the on_rotate function which is called by the screwdriver before trying to rotate the node
 -- I'm using it to update the connections when rotating a logic gate.
 -- Ideally there would be an after_rotate, but instead I just place the new node manually...
-function wires.on_rotate(pos, node, user, mode, new_param2)
+function wires3d.on_rotate(pos, node, user, mode, new_param2)
 	node.param2 = new_param2
 	modify_wire(pos, user, node)
 	return true
@@ -154,10 +152,10 @@ local function remove_insulation(itemstack, placer, pointed_thing)
 	if pos then
 		local under = minetest.get_node_or_nil(pos)
 		if under then
-			local state = under.name:match("^3d_wires:insulated_wire_(.*)")
+			local state = under.name:match("^wires3d:insulated_wire_(.*)")
 			if state then
-				modify_wire(pos, placer, {name = "3d_wires:wire_"..state})
-				minetest.handle_node_drops(pos, {minetest.itemstring_with_palette("3d_wires:insulation", under.param2)}, placer)
+				modify_wire(pos, placer, {name = "wires3d:wire_"..state})
+				minetest.handle_node_drops(pos, {minetest.itemstring_with_palette("wires3d:insulation", under.param2)}, placer)
 				return itemstack
 			end
 		end
@@ -171,18 +169,18 @@ local function add_insulation(itemstack, placer, pointed_thing)
 	if pos then
 		local under = minetest.get_node_or_nil(pos)
 		if under then
-			local type, state = under.name:match("^3d_wires:(.*)wire_(.*)")
+			local type, state = under.name:match("^wires3d:(.*)wire_(.*)")
 			local color = itemstack:get_meta():get_int("palette_index")
 			-- Add insulation to bare wires
 			if type == "" then
-				modify_wire(pos, placer, {name = "3d_wires:insulated_wire_"..state, param2 = color}, true)
+				modify_wire(pos, placer, {name = "wires3d:insulated_wire_"..state, param2 = color}, true)
 				take_unless_creative(placer, itemstack)
 				return itemstack
 			-- Replace insulation on insulated wires
 			elseif type == "insulated_" then
-				modify_wire(pos, placer, {name = "3d_wires:insulated_wire_"..state, param2 = color}, true)
+				modify_wire(pos, placer, {name = "wires3d:insulated_wire_"..state, param2 = color}, true)
 				take_unless_creative(placer, itemstack)
-				minetest.handle_node_drops(pos, {minetest.itemstring_with_palette("3d_wires:insulation", under.param2)}, placer)
+				minetest.handle_node_drops(pos, {minetest.itemstring_with_palette("wires3d:insulation", under.param2)}, placer)
 				return itemstack
 			end
 		end
@@ -197,12 +195,12 @@ local function cut_wire(itemstack, placer, pointed_thing)
 	if pointed_thing.under then
 		local under = minetest.get_node_or_nil(pointed_thing.under)
 		if under then
-			local field, state = under.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
+			local field, state = under.name:match("^wires3d:insulated_wire_([0-9]+)(.*)")
 			if field then
 				local _, _, box = place_rotated.get_point(placer)
 				local arm = pointed_box_to_direction(box, field)-1
 				if arm ~= -1 and check_bit(field, arm) then
-					modify_wire(pointed_thing.under, placer, {name="3d_wires:insulated_wire_"..(field-2^arm)..state, param2 = under.param2})
+					modify_wire(pointed_thing.under, placer, {name="wires3d:insulated_wire_"..(field-2^arm)..state, param2 = under.param2})
 				end
 			end
 		end
@@ -213,7 +211,7 @@ end
 local function add_connection(pos, node, placer, field, normal, state)
 	local face = vector_to_direction(normal)
 	if face and not check_bit(field, face-1) then
-		modify_wire(pos, placer, {name = "3d_wires:insulated_wire_"..(field + 2^(face - 1))..state, param2 = node.param2})
+		modify_wire(pos, placer, {name = "wires3d:insulated_wire_"..(field + 2^(face - 1))..state, param2 = node.param2})
 		return true
 	end
 end
@@ -225,7 +223,7 @@ local function splice_wire(itemstack, placer, pointed_thing)
 		local under=minetest.get_node(pointed_thing.under)
 		if under then
 			-- First, try to add a connection to the node that was clicked
-			local field, state = under.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
+			local field, state = under.name:match("^wires3d:insulated_wire_([0-9]+)(.*)")
 			if field then
 				local normal, point, box = place_rotated.get_point(placer)
 				local arm = pointed_box_to_direction(box, field)
@@ -237,7 +235,7 @@ local function splice_wire(itemstack, placer, pointed_thing)
 			-- This is so you can click on the node *behind* a wire to modify the side of the wire which is facing away from you
 			local above = minetest.get_node(pointed_thing.above)
 			if above then
-				local field, state = above.name:match("^3d_wires:insulated_wire_([0-9]+)(.*)")
+				local field, state = above.name:match("^wires3d:insulated_wire_([0-9]+)(.*)")
 				if field then
 					local normal, point, box = place_rotated.get_point(placer)
 					if add_connection(pointed_thing.above, above, placer, field, vector.multiply(normal, -1), state) then return end
@@ -298,40 +296,40 @@ local all_connections = {}
 for i, direction in ipairs(directions) do
 	all_connections[i] = direction.vector
 end
-wires.all_connections = all_connections
+wires3d.all_connections = all_connections
 
 local full_box = make_wire_nodeboxes(wire_radius)
 local full_insulated = make_wire_nodeboxes(insulated_wire_radius)
 for i = 0, 2^6-1 do
 	local node_box, insulated_node_box, mesecon_rules = generate_wire_info(full_box, full_insulated, i)
 	-- Insulated wire:
-	local name = "3d_wires:insulated_wire_"..i
+	local name = "wires3d:insulated_wire_"..i
 	mesecon.register_node(name, {
 		drop = {
 			items = {
-				{items = {"3d_wires:insulation"}, inherit_color = true},
-				{items = {"3d_wires:wire_0_off"}},
+				{items = {"wires3d:insulation"}, inherit_color = true},
+				{items = {"wires3d:wire_0_off"}},
 			}
 		},
 		paramtype = "light",
 		paramtype2 = "color",
-		palette = "3dwires_palette.png",
+		palette = "wires3d_palette.png",
 		drawtype = "nodebox",
 		node_box = insulated_node_box,
 		groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, not_in_creative_inventory = 1},
 		walkable = false,
 		climbable = true,
 	},{
-		tiles = {"3dwires_insulation_off.png"},
-		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_off.png^[mask:3dwires_wire_end_mask.png", color = "white"}, ""),
+		tiles = {"wires3d_insulation_off.png"},
+		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_off.png^[mask:wires3d_wire_end_mask.png", color = "white"}, ""),
 		mesecons = {conductor = {
 			state = "off",
 			onstate = name.."_on",
 			rules = mesecon_rules,
 		}}
 	},{
-		tiles = {"3dwires_insulation_on.png"},
-		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_on.png^[mask:3dwires_wire_end_mask.png", color = "white"}, ""),
+		tiles = {"wires3d_insulation_on.png"},
+		overlay_tiles = make_texture_list(i, {name = "mesecons_wire_on.png^[mask:wires3d_wire_end_mask.png", color = "white"}, ""),
 		mesecons = {conductor = {
 			state = "on",
 			offstate = name.."_off",
@@ -341,9 +339,9 @@ for i = 0, 2^6-1 do
 	-- Non-insulated wires:
 	local wire_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, mesecon_conductor_craftable = 1}
 	if i ~= 0 then wire_groups.not_in_creative_inventory = 1 end
-	local name = "3d_wires:wire_"..i
+	local name = "wires3d:wire_"..i
 	mesecon.register_node(name, {
-		drop = "3d_wires:wire_0_off",
+		drop = "wires3d:wire_0_off",
 		description = "3D Wire",
 		paramtype = "light",
 		drawtype = "nodebox",
@@ -413,7 +411,7 @@ end
 -- When user interacts with formspec
 local function color_machine_interact(pos, formname, fields, sender)
 	local node = minetest.get_node_or_nil(pos)
-	if node and node.name == "3d_wires:color_machine" then
+	if node and node.name == "wires3d:color_machine" then
 		if fields.quit then
 			local meta = minetest.get_meta(pos)
 			meta:set_string("formspec", make_color_machine_formspec(color_from_meta(meta)))
@@ -430,7 +428,7 @@ local function color_machine_interact(pos, formname, fields, sender)
 			
 			local inv = meta:get_inventory()
 			local items = inv:get_stack("insulation", 1)
-			if items:get_name() == "3d_wires:insulation" then
+			if items:get_name() == "wires3d:insulation" then
 				items:get_meta():set_int("palette_index", color_to_palette(color))
 				inv:set_stack("insulation", 1, items)
 			end
@@ -440,7 +438,7 @@ end
 
 -- Block items other than insulation in the insulation slot
 local function color_machine_input_filter(pos, listname, index, stack, player)
-	if listname == "insulation" and stack:get_name() ~= "3d_wires:insulation" then
+	if listname == "insulation" and stack:get_name() ~= "wires3d:insulation" then
 		return 0
 	else
 		return stack:get_count()
@@ -450,11 +448,11 @@ end
 -- When an item is put in the insulation field, set its color
 local function color_machine_on_put(pos, listname, index, stack, player)
 	local node = minetest.get_node_or_nil(pos)
-	if node and node.name == "3d_wires:color_machine" and listname == "insulation" then
+	if node and node.name == "wires3d:color_machine" and listname == "insulation" then
 		local meta = minetest.get_meta(pos)
 		local inv = meta:get_inventory()
 		local items = inv:get_stack(listname,index)
-		if items:get_name() == "3d_wires:insulation" then
+		if items:get_name() == "wires3d:insulation" then
 			items:get_meta():set_int("palette_index", color_to_palette(color_from_meta(meta)))
 			inv:set_stack(listname, index, items)
 		end
@@ -462,9 +460,9 @@ local function color_machine_on_put(pos, listname, index, stack, player)
 end
 
 -- Machine for coloring insulation
-minetest.register_node("3d_wires:color_machine",{
+minetest.register_node("wires3d:color_machine",{
 	description = "Insulation Coloring Machine",
-	tiles = {"3dwires_color_machine.png"},
+	tiles = {"wires3d_color_machine.png"},
 	groups = {cracky = 2},
 	-- Create formspec and inventory after node is created
 	on_construct = function(pos)
@@ -485,24 +483,24 @@ minetest.register_node("3d_wires:color_machine",{
 -- Insulation for wires
 -- Place = add insulation
 -- Punch = remove insulation 
-minetest.register_craftitem("3d_wires:insulation", {
+minetest.register_craftitem("wires3d:insulation", {
 	description = "Insulation",
-	inventory_image = "3dwires_insulation.png",
+	inventory_image = "wires3d_insulation.png",
 	on_place = add_insulation,
 	on_use = remove_insulation,
-	palette = "3dwires_palette.png",
+	palette = "wires3d_palette.png",
 })
 
 -- Tool for modifying the shape of insulated wires
 -- Place = add connection
 -- Punch = remove connection
-minetest.register_tool("3d_wires:wire_cutters", {
+minetest.register_tool("wires3d:wire_cutters", {
 	description = "Wire Cutters",
-	inventory_image = "3dwires_wire_cutters.png",
+	inventory_image = "wires3d_wire_cutters.png",
 	on_place = splice_wire,
 	on_use = cut_wire,
 })
 
-dofile(minetest.get_modpath("3d_wires").."/gates.lua") -- Logic gates
-dofile(minetest.get_modpath("3d_wires").."/craft.lua") -- Crafting recipes
-dofile(minetest.get_modpath("3d_wires").."/outputs.lua") -- "effectors"
+dofile(minetest.get_modpath("wires3d").."/gates.lua") -- Logic gates
+dofile(minetest.get_modpath("wires3d").."/craft.lua") -- Crafting recipes
+dofile(minetest.get_modpath("wires3d").."/outputs.lua") -- "effectors"

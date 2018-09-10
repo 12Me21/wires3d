@@ -1,6 +1,6 @@
 -- Wire cutters
 minetest.register_craft({
-	output = "3d_wires:wire_cutters",
+	output = "wires3d:wire_cutters",
 	recipe = {
 		{"default:steel_ingot",""                   ,"default:steel_ingot"},
 		{""                   ,"default:steel_ingot",""                   },
@@ -10,21 +10,21 @@ minetest.register_craft({
 
 -- Insulation
 minetest.register_craft({
-	output = minetest.itemstring_with_palette("3d_wires:insulation 3", 255),
+	output = minetest.itemstring_with_palette("wires3d:insulation 3", 255),
 	recipe = {{"mesecons_materials:fiber"}},
 })
 
 -- wire
 minetest.register_craft({
-	output = "3d_wires:wire_0_off",
+	output = "wires3d:wire_0_off",
 	recipe = {{"group:mesecon_conductor_craftable"}},
 })
 
 -- will probably change
 minetest.register_craft({
-	output = "3d_wires:color_machine",
+	output = "wires3d:color_machine",
 	type = "shapeless",
-	recipe = {"3d_wires:insulation","default:furnace"},
+	recipe = {"wires3d:insulation","default:furnace"},
 })
 
 -- =====
@@ -32,20 +32,20 @@ minetest.register_craft({
 -- =====
 
 minetest.register_craft({
-	output = "3d_wires:diode_off",
+	output = "wires3d:diode_off",
 	recipe = {
 		{"group:mesecon_conductor_craftable","mesecons_materials:silicon","group:mesecon_conductor_craftable"},
 	},
 })
 
 minetest.register_craft({
-	output = "3d_wires:or_gate_off",
+	output = "wires3d:or_gate_off",
 	type = "shapeless",
-	recipe = {"3d_wires:diode_off","3d_wires:diode_off"},
+	recipe = {"wires3d:diode_off","wires3d:diode_off"},
 })
 
 minetest.register_craft({
-	output = "3d_wires:and_gate_off",
+	output = "wires3d:and_gate_off",
 	recipe = {
 		{"","mesecons_materials:silicon",""},
 		{"group:mesecon_conductor_craftable","mesecons_materials:silicon","group:mesecon_conductor_craftable"},
@@ -54,7 +54,7 @@ minetest.register_craft({
 })
 
 minetest.register_craft({
-	output = "3d_wires:xor_gate_off",
+	output = "wires3d:xor_gate_off",
 	recipe = {
 		{"mesecons_materials:silicon","","mesecons_materials:silicon"},
 		{"group:mesecon_conductor_craftable","mesecons_materials:silicon","group:mesecon_conductor_craftable"},
@@ -63,7 +63,7 @@ minetest.register_craft({
 })
 
 minetest.register_craft({
-	output = "3d_wires:not_gate_off",
+	output = "wires3d:not_gate_off",
 	recipe = {
 		{"","default:mese_crystal",""},
 		{"group:mesecon_conductor_craftable","mesecons_materials:silicon","group:mesecon_conductor_craftable"},
@@ -72,25 +72,25 @@ minetest.register_craft({
 })
 
 minetest.register_craft({
-	output = "3d_wires:nor_gate_off",
+	output = "wires3d:nor_gate_off",
 	type = "shapeless",
-	recipe = {"3d_wires:or_gate_off","3d_wires:not_gate_off"},
+	recipe = {"wires3d:or_gate_off","wires3d:not_gate_off"},
 })
 
 minetest.register_craft({
-	output = "3d_wires:nand_gate_off",
+	output = "wires3d:nand_gate_off",
 	type = "shapeless",
-	recipe = {"3d_wires:and_gate_off","3d_wires:not_gate_off"},
+	recipe = {"wires3d:and_gate_off","wires3d:not_gate_off"},
 })
 
 minetest.register_craft({
-	output = "3d_wires:nxor_gate_off",
+	output = "wires3d:nxor_gate_off",
 	type = "shapeless",
-	recipe = {"3d_wires:xor_gate_off","3d_wires:not_gate_off"},
+	recipe = {"wires3d:xor_gate_off","wires3d:not_gate_off"},
 })
 
 minetest.register_craft({
-	output = "3d_wires:and_not_gate_off",
+	output = "wires3d:and_not_gate_off",
 	recipe = {
 		{"mesecons_materials:silicon","mesecons_materials:silicon","mesecons_materials:silicon"},
 		{"group:mesecon_conductor_craftable","mesecons_materials:silicon","group:mesecon_conductor_craftable"},
@@ -99,9 +99,9 @@ minetest.register_craft({
 })
 
 minetest.register_craft({
-	output = "3d_wires:or_not_gate_off",
+	output = "wires3d:or_not_gate_off",
 	type = "shapeless",
-	recipe = {"3d_wires:and_not_gate_off","3d_wires:not_gate_off"},
+	recipe = {"wires3d:and_not_gate_off","wires3d:not_gate_off"},
 })
 
 -- tool idea
