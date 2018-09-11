@@ -139,7 +139,11 @@ local gate_nodeboxes = {
 }
 
 local function make_wire_side_texture(state, side)
+<<<<<<< HEAD
 	return "^(mesecons_wire_"..state..".png^[mask:wires3d_wire_"..side.."_mask.png)"
+=======
+	return "^(mesecons_wire_"..state..".png^[mask:3dwires_wire_"..side.."_mask.png)"
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 end
 
 local function make_gate_tiles(filename, inputs, state, i)
@@ -147,6 +151,7 @@ local function make_gate_tiles(filename, inputs, state, i)
 		local input_state = check_bit(i, 0) and "on" or "off"
 		return {
 			--top
+<<<<<<< HEAD
 			"wires3d_gate_center.png"..
 			make_wire_side_texture(input_state,"end"),
 			--bottom
@@ -154,6 +159,15 @@ local function make_gate_tiles(filename, inputs, state, i)
 			make_wire_side_texture(state,"end"),
 			--sides
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png^wires3d_"..filename.."_symbol.png"..
+=======
+			"3dwires_gate_center.png"..
+			make_wire_side_texture(input_state,"end"),
+			--bottom
+			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png"..
+			make_wire_side_texture(state,"end"),
+			--sides
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png"..
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(state,"bottom")..
 			make_wire_side_texture(input_state,"top"),
 		}
@@ -162,15 +176,24 @@ local function make_gate_tiles(filename, inputs, state, i)
 		local b_state = check_bit(i, 1) and "on" or "off"
 		return {
 			--top
+<<<<<<< HEAD
 			"wires3d_gate_center.png^wires3d_"..filename.."_symbol.png"..
 			make_wire_side_texture(a_state,"left")..
 			make_wire_side_texture(b_state,"right"),
 			--bottom
 			"wires3d_gate_center.png^wires3d_diode_paint_bottom.png"..
+=======
+			"3dwires_gate_center.png^3dwires_"..filename.."_symbol.png"..
+			make_wire_side_texture(a_state,"left")..
+			make_wire_side_texture(b_state,"right"),
+			--bottom
+			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png"..
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(a_state,"left")..
 			make_wire_side_texture(b_state,"right")..
 			make_wire_side_texture(state,"end"),
 			--right
+<<<<<<< HEAD
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png"..
 			make_wire_side_texture(b_state,"end")..
 			make_wire_side_texture(state,"bottom"),
@@ -180,11 +203,26 @@ local function make_gate_tiles(filename, inputs, state, i)
 			make_wire_side_texture(state,"bottom"),
 			--back (+)
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png^(wires3d_"..filename.."_symbol.png^[transformR180)"..
+=======
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png"..
+			make_wire_side_texture(b_state,"end")..
+			make_wire_side_texture(state,"bottom"),
+			--left
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png"..
+			make_wire_side_texture(a_state,"end")..
+			make_wire_side_texture(state,"bottom"),
+			--back (+)
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png^(3dwires_"..filename.."_symbol.png^[transformR180)"..
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(a_state,"right")..
 			make_wire_side_texture(b_state,"left")..
 			make_wire_side_texture(state,"bottom"),
 			--front
+<<<<<<< HEAD
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png^wires3d_"..filename.."_symbol.png"..
+=======
+			"3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png"..
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(a_state,"left")..
 			make_wire_side_texture(b_state,"right")..
 			make_wire_side_texture(state,"bottom"),
@@ -207,7 +245,11 @@ local gate_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, overhe
 
 -- Register on/off forms of a 2-input gate called <name> using <gate_function>
 local function define_gate(name, description, gate_function, inputs)
+<<<<<<< HEAD
 	local basename = "wires3d:"..name
+=======
+	local basename = "3d_wires:"..name
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 	local updater = make_gate_updater(gate_function, basename, inputs)
 	for i = 0, 2^inputs-1 do
 		mesecon.register_node(basename.."_"..i, {
@@ -216,7 +258,11 @@ local function define_gate(name, description, gate_function, inputs)
 			paramtype2 = "facedir",
 			on_place = place_rotated.log,
 			drawtype = "nodebox",
+<<<<<<< HEAD
 			on_rotate = wires3d.on_rotate,
+=======
+			on_rotate = wires.on_rotate,
+>>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			node_box = gate_nodeboxes[inputs],
 			walkable = false,
 			climbable = true,
