@@ -6,6 +6,7 @@ local function check_bit(x, bit)
 	-- return (x >> bit & 1) == 1
 end
 
+
 local function rotate_rule(rule, axis, rotation)
 	for i = 1, rotation do
 		rule.x, rule.z = rule.z, -rule.x
@@ -34,15 +35,32 @@ local function rotate_rule(rule, axis, rotation)
 end
 
 -- Generates a function that outputs the rules, rotated to match the node
+-- local function make_rule_rotator(rules)
+	-- return function(node)
+		-- local rotation = node.param2 % 4
+		-- local axis = (node.param2 - rotation) / 4
+		-- local new_rules = {}
+		-- for i, rule in ipairs(rules) do
+			-- new_rules[i] = rotate_rule(table.copy(rule),axis,rotation)
+		-- end
+		-- return new_rules
+	-- end
+-- end
+
 local function make_rule_rotator(rules)
-	return function(node)
-		local rotation = node.param2 % 4
-		local axis = (node.param2 - rotation) / 4
-		local new_rules = {}
+	-- this table is going to end up with duplicates (for example, rule pointing straight up is the same for all rotations)
+	-- maybe replace all duplicate rules with references to the same table?
+	local rotations = {}
+	for facedir = 0, 24-1 do
+		rotations[facedir] = {}
+		local rotation = facedir % 4
+		local axis = (facedir - rotation) / 4
 		for i, rule in ipairs(rules) do
-			new_rules[i] = rotate_rule(table.copy(rule),axis,rotation)
+			rotations[facedir][i] = rotate_rule(table.copy(rule), axis, rotation)
 		end
-		return new_rules
+	end
+	return function(node)
+		return rotations[node.param2]
 	end
 end
 
@@ -74,15 +92,20 @@ local gate_input_rules = {
 	}),
 }
 
+local function do_overheat(pos, node)
+	if mesecon.do_overheat(pos) then
+		minetest.remove_node(pos)
+		mesecon.receptor_off(pos, gate_output_rules(node))
+		local def = minetest.registered_nodes[node.name]
+		minetest.add_item(pos, def.drop)
+		return true
+	end
+end
+
 local function make_gate_updater(gate_function, basename, inputs)
 	if inputs == 1 then
 		return function(pos, node, link, newstate)
-			if mesecon.do_overheat(pos) then
-				minetest.remove_node(pos)
-				mesecon.receptor_off(pos, gate_output_rules(node))
-				local def = minetest.registered_nodes[node.name]
-				minetest.add_item(pos, def.drop)
-			else
+			if not do_overheat(pos) then
 				local name = basename.."_"..(newstate == "on" and "1" or "0")
 				if gate_function(newstate == "on") then
 					minetest.swap_node(pos, {name = name.."_on", param2 = node.param2})
@@ -97,16 +120,11 @@ local function make_gate_updater(gate_function, basename, inputs)
 		return function(pos, node, link, newstate)
 			local meta = minetest.get_meta(pos)
 			meta:set_int(link.name, newstate == "on" and 1 or 0)
-			if mesecon.do_overheat(pos) then
-				minetest.remove_node(pos)
-				mesecon.receptor_off(pos, gate_output_rules(node))
-				local def = minetest.registered_nodes[node.name]
-				minetest.add_item(pos, def.drop)			
-			else
-				local a = meta:get_int("1")
-				local b = meta:get_int("2")
-				local name = basename.."_"..(a + b*2)
-				if gate_function(a == 1, b == 1) then
+			if not do_overheat(pos) then
+				local input_a = meta:get_int("1")
+				local input_b = meta:get_int("2")
+				local name = basename.."_"..(input_a + input_b*2)
+				if gate_function(input_a == 1, input_b == 1) then
 					minetest.swap_node(pos, {name = name.."_on", param2 = node.param2})
 					mesecon.receptor_on(pos, gate_output_rules(node))			
 				else
@@ -117,8 +135,6 @@ local function make_gate_updater(gate_function, basename, inputs)
 		end
 	end
 end
-
-local gate_side_texture_off = "mesecons_wire_off.png^wires3d_gate_center.png^(mesecons_wire_off.png^[mask:wires3d_wire_end_mask.png)"
 
 local gate_nodeboxes = {
 	[1] = {
@@ -139,11 +155,7 @@ local gate_nodeboxes = {
 }
 
 local function make_wire_side_texture(state, side)
-<<<<<<< HEAD
 	return "^(mesecons_wire_"..state..".png^[mask:wires3d_wire_"..side.."_mask.png)"
-=======
-	return "^(mesecons_wire_"..state..".png^[mask:3dwires_wire_"..side.."_mask.png)"
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 end
 
 local function make_gate_tiles(filename, inputs, state, i)
@@ -151,7 +163,6 @@ local function make_gate_tiles(filename, inputs, state, i)
 		local input_state = check_bit(i, 0) and "on" or "off"
 		return {
 			--top
-<<<<<<< HEAD
 			"wires3d_gate_center.png"..
 			make_wire_side_texture(input_state,"end"),
 			--bottom
@@ -159,15 +170,6 @@ local function make_gate_tiles(filename, inputs, state, i)
 			make_wire_side_texture(state,"end"),
 			--sides
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png^wires3d_"..filename.."_symbol.png"..
-=======
-			"3dwires_gate_center.png"..
-			make_wire_side_texture(input_state,"end"),
-			--bottom
-			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png"..
-			make_wire_side_texture(state,"end"),
-			--sides
-			"3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png"..
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(state,"bottom")..
 			make_wire_side_texture(input_state,"top"),
 		}
@@ -176,24 +178,15 @@ local function make_gate_tiles(filename, inputs, state, i)
 		local b_state = check_bit(i, 1) and "on" or "off"
 		return {
 			--top
-<<<<<<< HEAD
 			"wires3d_gate_center.png^wires3d_"..filename.."_symbol.png"..
 			make_wire_side_texture(a_state,"left")..
 			make_wire_side_texture(b_state,"right"),
 			--bottom
 			"wires3d_gate_center.png^wires3d_diode_paint_bottom.png"..
-=======
-			"3dwires_gate_center.png^3dwires_"..filename.."_symbol.png"..
-			make_wire_side_texture(a_state,"left")..
-			make_wire_side_texture(b_state,"right"),
-			--bottom
-			"3dwires_gate_center.png^3dwires_diode_paint_bottom.png"..
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(a_state,"left")..
 			make_wire_side_texture(b_state,"right")..
 			make_wire_side_texture(state,"end"),
 			--right
-<<<<<<< HEAD
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png"..
 			make_wire_side_texture(b_state,"end")..
 			make_wire_side_texture(state,"bottom"),
@@ -203,26 +196,11 @@ local function make_gate_tiles(filename, inputs, state, i)
 			make_wire_side_texture(state,"bottom"),
 			--back (+)
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png^(wires3d_"..filename.."_symbol.png^[transformR180)"..
-=======
-			"3dwires_gate_center.png^3dwires_diode_paint_side.png"..
-			make_wire_side_texture(b_state,"end")..
-			make_wire_side_texture(state,"bottom"),
-			--left
-			"3dwires_gate_center.png^3dwires_diode_paint_side.png"..
-			make_wire_side_texture(a_state,"end")..
-			make_wire_side_texture(state,"bottom"),
-			--back (+)
-			"3dwires_gate_center.png^3dwires_diode_paint_side.png^(3dwires_"..filename.."_symbol.png^[transformR180)"..
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(a_state,"right")..
 			make_wire_side_texture(b_state,"left")..
 			make_wire_side_texture(state,"bottom"),
 			--front
-<<<<<<< HEAD
 			"wires3d_gate_center.png^wires3d_diode_paint_side.png^wires3d_"..filename.."_symbol.png"..
-=======
-			"3dwires_gate_center.png^3dwires_diode_paint_side.png^3dwires_"..filename.."_symbol.png"..
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			make_wire_side_texture(a_state,"left")..
 			make_wire_side_texture(b_state,"right")..
 			make_wire_side_texture(state,"bottom"),
@@ -245,11 +223,7 @@ local gate_groups = {snappy = 2, choppy = 2, oddly_breakable_by_hand = 2, overhe
 
 -- Register on/off forms of a 2-input gate called <name> using <gate_function>
 local function define_gate(name, description, gate_function, inputs)
-<<<<<<< HEAD
 	local basename = "wires3d:"..name
-=======
-	local basename = "3d_wires:"..name
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 	local updater = make_gate_updater(gate_function, basename, inputs)
 	for i = 0, 2^inputs-1 do
 		mesecon.register_node(basename.."_"..i, {
@@ -258,11 +232,7 @@ local function define_gate(name, description, gate_function, inputs)
 			paramtype2 = "facedir",
 			on_place = place_rotated.log,
 			drawtype = "nodebox",
-<<<<<<< HEAD
 			on_rotate = wires3d.on_rotate,
-=======
-			on_rotate = wires.on_rotate,
->>>>>>> d3d20cd88e4eaed584ac65c36e73f92bf84c9a42
 			node_box = gate_nodeboxes[inputs],
 			walkable = false,
 			climbable = true,
@@ -275,7 +245,7 @@ local function define_gate(name, description, gate_function, inputs)
 				rules = gate_output_rules,
 			}, effector = {
 				rules = gate_input_rules[inputs],
-				action_change = updater
+				action_change = updater,
 			}}
 		},{
 			groups = make_groups(gate_groups, -1),
@@ -285,7 +255,7 @@ local function define_gate(name, description, gate_function, inputs)
 				rules = gate_output_rules,
 			}, effector = {
 				rules = gate_input_rules[inputs],
-				action_change = updater
+				action_change = updater,
 			}}
 		})
 	end
